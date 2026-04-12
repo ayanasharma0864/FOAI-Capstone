@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Personal Finance Tracker & Advisor</title>
+    <meta name="description" content="AI-powered expense tracker for students — track, categorize, and analyze your spending with smart insights.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Floating Particles Background -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <span class="logo-icon">💰</span>
+                <div>
+                    <h1>FinanceAI</h1>
+                    <p class="logo-sub">AI Personal Finance Tracker & Advisor</p>
+                </div>
+            </div>
+            <div class="header-stats">
+                <div class="header-stat">
+                    <span class="header-stat-label">This Month</span>
+                    <span class="header-stat-value" id="headerTotal">₹0</span>
+                </div>
+                <div class="header-stat">
+                    <span class="header-stat-label">Budget Left</span>
+                    <span class="header-stat-value" id="headerBudgetLeft">₹15,000</span>
+                </div>
+                <div class="header-stat savings-stat">
+                    <span class="header-stat-label">Savings Rate</span>
+                    <span class="header-stat-value" id="headerSavings">100%</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+        <button class="nav-tab active" data-tab="dashboard" id="tabDashboard">
+            <span class="tab-icon">📊</span> Dashboard
+        </button>
+        <button class="nav-tab" data-tab="add" id="tabAdd">
+            <span class="tab-icon">➕</span> Log Expense
+        </button>
+        <button class="nav-tab" data-tab="expenses" id="tabExpenses">
+            <span class="tab-icon">📋</span> All Expenses
+        </button>
+        <button class="nav-tab" data-tab="insights" id="tabInsights">
+            <span class="tab-icon">🤖</span> AI Insights
+        </button>
+    </nav>
+
+    <main class="main-content">
+
+        <!-- ===== DASHBOARD TAB ===== -->
+        <section class="tab-content active" id="dashboard">
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="summary-card card-spent">
+                    <div class="card-icon">💸</div>
+                    <div class="card-info">
+                        <span class="card-label">Total Spent</span>
+                        <span class="card-value" id="totalSpent">₹0</span>
+                    </div>
+                    <div class="card-trend" id="spentTrend">—</div>
+                </div>
+                <div class="summary-card card-budget">
+                    <div class="card-icon">🎯</div>
+                    <div class="card-info">
+                        <span class="card-label">Monthly Budget</span>
+                        <span class="card-value">₹15,000</span>
+                    </div>
+                    <div class="card-progress">
+                        <div class="progress-bar" id="budgetProgress"></div>
+                    </div>
+                </div>
+                <div class="summary-card card-savings">
+                    <div class="card-icon">🐷</div>
+                    <div class="card-info">
+                        <span class="card-label">Saved</span>
+                        <span class="card-value" id="totalSaved">₹15,000</span>
+                    </div>
+                    <div class="card-trend positive" id="savingsTrend">🎉 On track!</div>
+                </div>
+                <div class="summary-card card-transactions">
+                    <div class="card-icon">🧾</div>
+                    <div class="card-info">
+                        <span class="card-label">Transactions</span>
+                        <span class="card-value" id="totalTransactions">0</span>
+                    </div>
+                    <div class="card-trend" id="avgTransaction">Avg: ₹0</div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <h3>📊 Category Distribution</h3>
+                    <div class="chart-container">
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>📈 Weekly Spending Trend</h3>
+                    <div class="chart-container">
+                        <canvas id="lineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Breakdown -->
+            <div class="category-breakdown">
+                <h3>💳 Category-wise Budget Status</h3>
+                <div class="category-bars" id="categoryBars">
+                    <!-- Dynamically generated -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== ADD EXPENSE TAB ===== -->
+        <section class="tab-content" id="add">
+            <div class="form-container">
+                <div class="form-header">
+                    <h2>📝 Log New Expense</h2>
+                    <p>Fill in the details below. Our AI will automatically categorize it.</p>
+                </div>
+                <form id="expenseForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="amount">Amount (₹) <span class="required">*</span></label>
+                            <div class="input-wrapper">
+                                <span class="input-prefix">₹</span>
+                                <input type="number" id="amount" placeholder="250" min="1" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="date">Date <span class="required">*</span></label>
+                            <input type="date" id="date" required>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="description">Description <span class="required">*</span></label>
+                            <input type="text" id="description" placeholder="e.g., Zomato lunch, Uber to college, Netflix subscription" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="categoryOverride">Category Override <span class="optional">(optional)</span></label>
+                            <select id="categoryOverride">
+                                <option value="">🤖 Let AI decide</option>
+                                <option value="Food">🍕 Food</option>
+                                <option value="Transport">🚗 Transport</option>
+                                <option value="Entertainment">🎬 Entertainment</option>
+                                <option value="Utilities">💡 Utilities</option>
+                                <option value="Education">📚 Education</option>
+                                <option value="Shopping">🛍️ Shopping</option>
+                                <option value="Health">💊 Health</option>
+                                <option value="Personal Care">💇 Personal Care</option>
+                                <option value="Rent/Housing">🏠 Rent/Housing</option>
+                                <option value="Miscellaneous">📦 Miscellaneous</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- AI Preview -->
+                    <div class="ai-preview" id="aiPreview" style="display:none;">
+                        <div class="ai-badge">🤖 AI Prediction</div>
+                        <div class="ai-result">
+                            <span class="ai-category" id="aiCategory"></span>
+                            <span class="ai-subcategory" id="aiSubcategory"></span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        <span class="btn-text">Add Expense</span>
+                        <span class="btn-icon">→</span>
+                    </button>
+                </form>
+
+                <!-- Success Toast -->
+                <div class="toast" id="toast">
+                    <span>✅ Expense logged successfully!</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== EXPENSES TAB ===== -->
+        <section class="tab-content" id="expenses">
+            <div class="expenses-header">
+                <h2>📋 All Expenses</h2>
+                <div class="filter-row">
+                    <select id="filterCategory" class="filter-select">
+                        <option value="all">All Categories</option>
+                        <option value="Food">🍕 Food</option>
+                        <option value="Transport">🚗 Transport</option>
+                        <option value="Entertainment">🎬 Entertainment</option>
+                        <option value="Utilities">💡 Utilities</option>
+                        <option value="Education">📚 Education</option>
+                        <option value="Shopping">🛍️ Shopping</option>
+                        <option value="Health">💊 Health</option>
+                        <option value="Personal Care">💇 Personal Care</option>
+                        <option value="Rent/Housing">🏠 Rent/Housing</option>
+                        <option value="Miscellaneous">📦 Miscellaneous</option>
+                    </select>
+                    <button class="clear-btn" id="clearAll">🗑️ Clear All</button>
+                </div>
+            </div>
+            <div class="expenses-table-wrapper">
+                <table class="expenses-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>AI Category</th>
+                            <th>Final Category</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expensesBody">
+                        <!-- Dynamically populated -->
+                    </tbody>
+                </table>
+                <div class="empty-state" id="emptyState">
+                    <span class="empty-icon">📭</span>
+                    <p>No expenses logged yet. Start by adding one!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== AI INSIGHTS TAB ===== -->
+        <section class="tab-content" id="insights">
+            <div class="insights-container">
+                <div class="insights-header">
+                    <h2>🤖 AI-Generated Spending Insights</h2>
+                    <p>Smart analysis based on your spending patterns</p>
+                    <button class="refresh-btn" id="refreshInsights">🔄 Refresh Analysis</button>
+                </div>
+
+                <!-- Alerts -->
+                <div class="alerts-section" id="alertsSection">
+                    <!-- Dynamically generated -->
+                </div>
+
+                <!-- Weekly Comparison -->
+                <div class="weekly-card">
+                    <h3>📅 Weekly Comparison</h3>
+                    <div class="weekly-grid" id="weeklyGrid">
+                        <!-- Dynamically generated -->
+                    </div>
+                </div>
+
+                <!-- AI Recommendations -->
+                <div class="recommendations-card">
+                    <h3>💡 Personalized Savings Recommendations</h3>
+                    <div class="recommendations-list" id="recommendationsList">
+                        <!-- Dynamically generated -->
+                    </div>
+                </div>
+
+                <!-- Knowledge Map -->
+                <div class="knowledge-card">
+                    <h3>📚 Financial Tips by Category</h3>
+                    <div class="tips-grid" id="tipsGrid">
+                        <!-- Dynamically generated -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Built with ❤️ for FOAI CapStone Project | AI Personal Finance Tracker & Advisor</p>
+        <p class="footer-sub">Tech Stack: Google Forms • Google Sheets • ChatGPT/Gemini • Canva</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
