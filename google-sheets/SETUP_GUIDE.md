@@ -123,6 +123,41 @@ To make expense logging even easier:
 
 ---
 
+## Step 9: Connect the Web App to Google Sheets 🔗
+
+This makes it so expenses logged on the **web app (index.html)** automatically appear in **Google Sheets**.
+
+### Deploy as Web App:
+1. In the Apps Script editor, click **Deploy → New Deployment**
+2. Click the ⚙️ gear icon → Select **"Web app"**
+3. Set:
+   - **Description**: "Finance Tracker API"
+   - **Execute as**: Me
+   - **Who has access**: **Anyone**
+4. Click **Deploy**
+5. **Copy the Web App URL** (it looks like: `https://script.google.com/macros/s/xxxxx/exec`)
+
+### Paste into Web App:
+1. Open `app.js` in your project folder
+2. Find this line near the top:
+   ```js
+   googleSheetsUrl: '',
+   ```
+3. Paste your URL between the quotes:
+   ```js
+   googleSheetsUrl: 'https://script.google.com/macros/s/YOUR_ID_HERE/exec',
+   ```
+4. Save the file
+
+### Test it:
+1. Open `index.html` in your browser
+2. Go to **"Log Expense"** tab
+3. Add a test expense (e.g., ₹100, "test chai")
+4. The header will show **"🟢 Synced to Google Sheets"**
+5. Check your Google Sheet — the expense should appear in the **📝 Raw Data** tab!
+
+---
+
 ## Quick Reference — Menu Options
 
 | Menu Item | What It Does |
@@ -145,3 +180,6 @@ To make expense logging even easier:
 | Formulas show #REF | Run "🚀 Setup Everything" again |
 | Categories not filling | Click "🤖 AI Categorize All" |
 | Chart not showing | Click "📊 Refresh Dashboard" |
+| Web app shows "Not Connected" | Make sure you pasted the URL in `app.js` |
+| Sync failed error | Re-deploy the web app and use the new URL |
+

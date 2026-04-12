@@ -8,6 +8,11 @@ const CONFIG = {
     savingsTargetMin: 10,
     savingsTargetMax: 15,
     spikeThreshold: 20,
+
+    // ⬇️ PASTE YOUR GOOGLE SHEETS WEB APP URL HERE ⬇️
+    // (See google-sheets/SETUP_GUIDE.md → "Deploy as Web App" section)
+    googleSheetsUrl: '',
+
     categories: {
         'Food':          { threshold: 35, icon: '🍕', color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444, #f97316)' },
         'Transport':     { threshold: 15, icon: '🚗', color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #6366f1)' },
@@ -113,7 +118,65 @@ function addExpense(expense) {
     expense.timestamp = new Date().toISOString();
     expenses.unshift(expense);
     saveExpenses(expenses);
+
+    // Also send to Google Sheets if connected
+    sendToGoogleSheets(expense);
+
     return expense;
+}
+
+// ===== GOOGLE SHEETS SYNC =====
+function sendToGoogleSheets(expense) {
+    if (!CONFIG.googleSheetsUrl) {
+        updateSyncStatus('not-connected');
+        return;
+    }
+
+    updateSyncStatus('syncing');
+
+    fetch(CONFIG.googleSheetsUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            amount: expense.amount,
+            date: expense.date,
+            description: expense.description,
+            categoryOverride: expense.categoryOverride || '',
+        }),
+    })
+    .then(() => {
+        // no-cors means we can't read the response, but if it didn't throw, it was sent
+        updateSyncStatus('synced');
+        console.log('✅ Sent to Google Sheets:', expense.description);
+    })
+    .catch(err => {
+        updateSyncStatus('error');
+        console.error('❌ Google Sheets sync failed:', err);
+    });
+}
+
+function updateSyncStatus(status) {
+    const indicator = document.getElementById('syncStatus');
+    if (!indicator) return;
+
+    const states = {
+        'not-connected': { text: '⚪ Sheets: Not Connected', class: 'sync-off' },
+        'syncing':       { text: '🔄 Syncing to Sheets...', class: 'sync-pending' },
+        'synced':        { text: '🟢 Synced to Google Sheets', class: 'sync-ok' },
+        'error':         { text: '🔴 Sheets Sync Failed', class: 'sync-error' },
+    };
+
+    const s = states[status] || states['not-connected'];
+    indicator.textContent = s.text;
+    indicator.className = 'sync-indicator ' + s.class;
+
+    // Auto-hide success after 3s
+    if (status === 'synced') {
+        setTimeout(() => {
+            indicator.textContent = '🟢 Connected to Sheets';
+        }, 3000);
+    }
 }
 
 function deleteExpense(id) {

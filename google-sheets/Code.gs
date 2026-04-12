@@ -621,6 +621,88 @@ function onFormSubmit(e) {
   sheet.getRange(row, 1, 1, 8).setBackground(bgColor);
 }
 
+// ===== WEB APP API (connects web app to Google Sheets) =====
+// Deploy: Deploy → New Deployment → Web App → Execute as: Me → Access: Anyone
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('📝 Raw Data');
+    
+    if (!sheet) {
+      return sendJsonResponse({ success: false, error: 'Sheet not found. Run Setup first.' });
+    }
+    
+    const ai = categorizeExpense(data.description || '');
+    const finalCategory = data.categoryOverride || ai.category;
+    const timestamp = new Date().toLocaleString('en-IN');
+    
+    const nextRow = sheet.getLastRow() + 1;
+    sheet.getRange(nextRow, 1).setValue(timestamp);
+    sheet.getRange(nextRow, 2).setValue(parseFloat(data.amount));
+    sheet.getRange(nextRow, 3).setValue(new Date(data.date));
+    sheet.getRange(nextRow, 4).setValue(data.description);
+    sheet.getRange(nextRow, 5).setValue(data.categoryOverride || '');
+    sheet.getRange(nextRow, 6).setValue(ai.category);
+    sheet.getRange(nextRow, 7).setValue(ai.subcategory);
+    // Column H has the Final Category formula already
+    
+    // Set alternating color
+    const bgColor = nextRow % 2 === 0 ? '#ffffff' : '#f0f4ff';
+    sheet.getRange(nextRow, 1, 1, 8).setBackground(bgColor);
+    
+    return sendJsonResponse({
+      success: true,
+      message: `₹${data.amount} — ${data.description} → ${finalCategory}`,
+      row: nextRow,
+      aiCategory: ai.category,
+      aiSubcategory: ai.subcategory,
+      finalCategory: finalCategory,
+    });
+    
+  } catch (err) {
+    return sendJsonResponse({ success: false, error: err.toString() });
+  }
+}
+
+function doGet(e) {
+  // Returns all expenses as JSON (for syncing)
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('📝 Raw Data');
+    
+    if (!sheet || sheet.getLastRow() < 2) {
+      return sendJsonResponse({ success: true, expenses: [] });
+    }
+    
+    const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).getValues();
+    const expenses = data
+      .filter(row => row[1]) // has amount
+      .map(row => ({
+        timestamp: row[0],
+        amount: row[1],
+        date: row[2],
+        description: row[3],
+        categoryOverride: row[4],
+        aiCategory: row[5],
+        aiSubcategory: row[6],
+        finalCategory: row[7],
+      }));
+    
+    return sendJsonResponse({ success: true, expenses: expenses });
+    
+  } catch (err) {
+    return sendJsonResponse({ success: false, error: err.toString() });
+  }
+}
+
+function sendJsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 // ===== HTML FOR ADD EXPENSE DIALOG =====
 function getAddExpenseHTML() {
   return `
