@@ -1,0 +1,21 @@
+Timestamp,Amount (₹),Date of Expense,Description,Category (Override),Category (AI),Subcategory (AI),Final Category
+2025-04-01 09:15:00,250,2025-04-01,Zomato lunch,,Food,Delivery,Food
+2025-04-01 14:30:00,150,2025-04-01,Metro card recharge,,Transport,Metro/Bus,Transport
+2025-04-02 10:00:00,499,2025-04-02,Netflix monthly subscription,,Entertainment,Streaming,Entertainment
+2025-04-02 18:45:00,80,2025-04-02,Chai and samosa at canteen,,Food,Snacks,Food
+2025-04-03 08:00:00,1200,2025-04-03,New t-shirt from Myntra,,Shopping,Clothing,Shopping
+2025-04-03 12:00:00,350,2025-04-03,Uber to airport,,Transport,Cab,Transport
+2025-04-04 16:00:00,200,2025-04-04,Paracetamol from pharmacy,,Health,Medicines,Health
+2025-04-04 20:00:00,5000,2025-04-04,Monthly room rent,Rent/Housing,Rent/Housing,Rent,Rent/Housing
+2025-04-05 11:30:00,120,2025-04-05,Mobile recharge Jio,,Utilities,Mobile Recharge,Utilities
+2025-04-05 13:00:00,450,2025-04-05,Swiggy dinner,,Food,Delivery,Food
+2025-04-06 09:00:00,300,2025-04-06,Haircut at salon,,Personal Care,Salon,Personal Care
+2025-04-06 15:00:00,180,2025-04-06,Auto rickshaw to market,,Transport,Auto,Transport
+2025-04-07 10:00:00,850,2025-04-07,Groceries from BigBasket,,Food,Groceries,Food
+2025-04-07 19:00:00,599,2025-04-07,Coursera course subscription,,Education,Courses,Education
+2025-04-08 08:30:00,60,2025-04-08,Tea and biscuits,,Food,Snacks,Food
+2025-04-08 14:00:00,1500,2025-04-08,Electricity bill payment,,Utilities,Electricity,Utilities
+2025-04-09 12:00:00,320,2025-04-09,Dominos pizza with friends,,Food,Dining Out,Food
+2025-04-09 17:00:00,250,2025-04-09,Movie tickets PVR,,Entertainment,Movies,Entertainment
+2025-04-10 09:00:00,400,2025-04-10,Uber to office,,Transport,Cab,Transport
+2025-04-10 20:00:00,180,2025-04-10,Maggi and juice at hostel,,Food,Snacks,Food

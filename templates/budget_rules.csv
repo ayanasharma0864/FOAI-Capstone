@@ -1,0 +1,15 @@
+Rule Type,Category,Condition,Threshold Value,Alert Level,Recommendation
+Category Budget,Food,Percentage of total spending,35%,Red - Over Budget,Reduce food delivery to 2x/week. Cook at home more.
+Category Budget,Transport,Percentage of total spending,15%,Red - Over Budget,Use public transport 3x/week instead of cabs.
+Category Budget,Entertainment,Percentage of total spending,10%,Red - Over Budget,Review and share streaming subscriptions.
+Category Budget,Utilities,Percentage of total spending,10%,Red - Over Budget,Compare mobile/internet plans for cheaper options.
+Category Budget,Education,Percentage of total spending,10%,Red - Over Budget,Look for free alternatives (YouTube/NPTEL/MOOCs).
+Category Budget,Shopping,Percentage of total spending,10%,Red - Over Budget,Use 48-hour rule before non-essential purchases.
+Category Budget,Health,Percentage of total spending,5%,Red - Over Budget,Focus on preventive care and home workouts.
+Category Budget,Personal Care,Percentage of total spending,5%,Red - Over Budget,Space out salon visits. Try DIY grooming.
+Category Budget,Miscellaneous,Percentage of total spending,5%,Red - Over Budget,Review and categorize properly.
+Weekly Spike,All Categories,Week-over-week increase,20%,Yellow - Warning,Review this weeks transactions for unnecessary expenses.
+Monthly Total,All Categories,Total monthly spending,15000,Red - Over Budget,Reduce discretionary spending immediately.
+Savings Target,All Categories,Monthly savings rate,10%,Green - Minimum Goal,You are meeting minimum savings target.
+Savings Target,All Categories,Monthly savings rate,15%,Green - Ideal Goal,You are meeting ideal savings target.
+Near Limit,Any Category,Within 5% of threshold,Threshold minus 5%,Yellow - Approaching,Slow down spending in this category.
