@@ -4,26 +4,27 @@
 
 // ===== CONFIGURATION =====
 const CONFIG = {
-    monthlyBudget: 15000,
+    monthlyBudget: parseInt(localStorage.getItem('financeai_budget')) || 15000,
     savingsTargetMin: 10,
     savingsTargetMax: 15,
     spikeThreshold: 20,
 
-    // ⬇️ PASTE YOUR GOOGLE SHEETS WEB APP URL HERE ⬇️
-    // (See google-sheets/SETUP_GUIDE.md → "Deploy as Web App" section)
-    googleSheetsUrl: '',
+    // ⬇️ GOOGLE SHEETS CONFIGURATION ⬇️
+    sheetCsvUrl: 'https://docs.google.com/spreadsheets/d/18_kS3zuA3mkE87lxPZkBXra4kjJk4esB7RkDpzVCWBc/gviz/tq?tqx=out:csv&gid=1488467775',
+    formUrl: 'https://docs.google.com/forms/d/e/1FAIpQLScYU-Iz4EYuGzhTB17QlA1KJc0YIz6QJkFVqdodrrlD9hspqw/viewform?embedded=true',
 
     categories: {
-        'Food':          { threshold: 35, icon: '🍕', color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444, #f97316)' },
-        'Transport':     { threshold: 15, icon: '🚗', color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #6366f1)' },
-        'Entertainment': { threshold: 10, icon: '🎬', color: '#ec4899', gradient: 'linear-gradient(135deg, #ec4899, #a855f7)' },
-        'Utilities':     { threshold: 10, icon: '💡', color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b, #eab308)' },
-        'Education':     { threshold: 10, icon: '📚', color: '#06b6d4', gradient: 'linear-gradient(135deg, #06b6d4, #3b82f6)' },
-        'Shopping':      { threshold: 10, icon: '🛍️', color: '#a855f7', gradient: 'linear-gradient(135deg, #a855f7, #ec4899)' },
-        'Health':        { threshold: 5,  icon: '💊', color: '#10b981', gradient: 'linear-gradient(135deg, #10b981, #06b6d4)' },
-        'Personal Care': { threshold: 5,  icon: '💇', color: '#f97316', gradient: 'linear-gradient(135deg, #f97316, #ef4444)' },
-        'Rent/Housing':  { threshold: 0,  icon: '🏠', color: '#6366f1', gradient: 'linear-gradient(135deg, #6366f1, #3b82f6)' },
-        'Miscellaneous': { threshold: 5,  icon: '📦', color: '#6b7280', gradient: 'linear-gradient(135deg, #6b7280, #4b5563)' },
+        'Food':          { threshold: 35, icon: '🍕', color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444, #f97316)', description: 'Groceries, dining out, and food delivery apps' },
+        'Transport':     { threshold: 15, icon: '🚗', color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #6366f1)', description: 'Cabs, metro, bus, fuel, and parking' },
+        'Entertainment': { threshold: 10, icon: '🎬', color: '#ec4899', gradient: 'linear-gradient(135deg, #ec4899, #a855f7)', description: 'Movies, streaming, outings, and hobbies' },
+        'Utilities':     { threshold: 10, icon: '💡', color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b, #eab308)', description: 'Bills, recharge, internet, and subscriptions' },
+        'Education':     { threshold: 10, icon: '📚', color: '#06b6d4', gradient: 'linear-gradient(135deg, #06b6d4, #3b82f6)', description: 'Books, courses, and educational tools' },
+        'Shopping':      { threshold: 10, icon: '🛍️', color: '#a855f7', gradient: 'linear-gradient(135deg, #a855f7, #ec4899)', description: 'Clothes, electronics, and online shopping' },
+        'Health':        { threshold: 5,  icon: '💊', color: '#10b981', gradient: 'linear-gradient(135deg, #10b981, #06b6d4)', description: 'Medicine, gym, and medical visits' },
+        'Personal Care': { threshold: 5,  icon: '💇', color: '#f97316', gradient: 'linear-gradient(135deg, #f97316, #ef4444)', description: 'Salon, grooming, and cosmetics' },
+        'Rent/Housing':  { threshold: 0,  icon: '🏠', color: '#6366f1', gradient: 'linear-gradient(135deg, #6366f1, #3b82f6)', description: 'Monthly rent, PG fees, and maintenance' },
+        'Miscellaneous': { threshold: 5,  icon: '📦', color: '#1e3a8a', gradient: 'linear-gradient(135deg, #1e40af, #1e3a8a)', description: 'Gifts, donations, and other random expenses' },
+        'Academics':     { threshold: 10, icon: '🎓', color: '#06b6d4', gradient: 'linear-gradient(135deg, #06b6d4, #3b82f6)', description: 'School/College fees and related expenses' },
     }
 };
 
@@ -101,15 +102,171 @@ function aiCategorize(description) {
 }
 
 // ===== DATA MANAGEMENT =====
-const STORAGE_KEY = 'financeai_expenses';
+const STORAGE_KEY = 'financeai_expenses_cache';
+const OVERRIDE_KEY = 'financeai_amount_overrides';
 
-function loadExpenses() {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+let cachedExpenses = [];
+
+async function loadExpenses(forceRefresh = false) {
+    // If cleared in this session and not forcing refresh, return empty
+    if (sessionStorage.getItem('financeai_cleared') === 'true' && !forceRefresh) {
+        return [];
+    }
+
+    if (cachedExpenses.length > 0 && !forceRefresh) {
+        return applyLocalOverrides(cachedExpenses);
+    }
+
+    try {
+        updateSyncStatus('syncing');
+        const response = await fetch(CONFIG.sheetCsvUrl);
+        const csvText = await response.text();
+        const rows = csvText.split('\n').filter(row => row.trim() !== '');
+        
+        // Skip header
+        const dataRows = rows.slice(1);
+        
+        // Get clear timestamp for permanent filtering
+        const clearTimestampStr = localStorage.getItem('financeai_clear_timestamp');
+        const clearTimestamp = clearTimestampStr ? new Date(clearTimestampStr).getTime() : 0;
+
+        const expenses = dataRows.map((row, index) => {
+            const cols = parseCsvRow(row);
+            const dateStr = cols[0] || '';
+            const timestamp = new Date(dateStr).getTime();
+            
+            // Skip if older than clear timestamp
+            if (timestamp <= clearTimestamp) return null;
+
+            const amount = parseFloat(cols[1]) || 0;
+            const description = cols[2] || '';
+            const categoryOverride = cols[3] || '';
+            
+            // Get AI category from column 4, fallback to local logic if needed
+            let aiCategoryFull = cols[4] || '';
+            let aiCategory, aiSubcategory;
+
+            if (!aiCategoryFull || aiCategoryFull === 'Miscellaneous' || aiCategoryFull === 'Uncategorized') {
+                const localAI = aiCategorize(description);
+                aiCategory = localAI.category;
+                aiSubcategory = localAI.subcategory;
+            } else {
+                const parts = aiCategoryFull.split(' - ');
+                aiCategory = parts[0].trim();
+                aiSubcategory = parts[1] || 'Uncategorized';
+            }
+
+            const dateObj = new Date(dateStr);
+            const date = isNaN(dateObj.getTime()) ? new Date().toISOString().split('T')[0] : dateObj.toISOString().split('T')[0];
+
+            return {
+                id: `sheet-${index}`,
+                amount,
+                date,
+                description,
+                categoryOverride,
+                aiCategory,
+                aiSubcategory,
+                finalCategory: categoryOverride || aiCategory,
+                timestamp: dateStr,
+                rawTimestamp: timestamp
+            };
+        }).filter(e => e !== null);
+
+        cachedExpenses = expenses.reverse(); // Newest first
+        updateSyncStatus('synced');
+        return applyLocalOverrides(cachedExpenses);
+    } catch (err) {
+        console.error('❌ Failed to fetch from Google Sheets:', err);
+        updateSyncStatus('error');
+        // Fallback to local storage cache if available
+        const localData = localStorage.getItem(STORAGE_KEY);
+        if (localData) {
+            cachedExpenses = JSON.parse(localData);
+            return applyLocalOverrides(cachedExpenses);
+        }
+        return [];
+    }
 }
 
-function saveExpenses(expenses) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+function parseCsvRow(row) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < row.length; i++) {
+        const char = row[i];
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    result.push(current.trim());
+    return result;
+}
+
+function applyLocalOverrides(expenses) {
+    const overrides = getAmountOverrides();
+    return expenses.map(e => {
+        if (overrides[e.id]) {
+            return { ...e, amount: overrides[e.id], isEdited: true };
+        }
+        return e;
+    });
+}
+
+function getAmountOverrides() {
+    const data = localStorage.getItem(OVERRIDE_KEY);
+    return data ? JSON.parse(data) : {};
+}
+
+function saveAmountOverride(id, amount) {
+    const overrides = getAmountOverrides();
+    overrides[id] = parseFloat(amount);
+    localStorage.setItem(OVERRIDE_KEY, JSON.stringify(overrides));
+}
+
+async function handleClearAll() {
+    if (!confirm('Are you sure? This will hide all existing data and start a fresh record. (Your actual Google Sheet will keep its history)')) return;
+    
+    console.log('🧹 Permanently clearing local view...');
+    
+    // Save current time as clear timestamp
+    localStorage.setItem('financeai_clear_timestamp', new Date().toISOString());
+    
+    cachedExpenses = [];
+    localStorage.removeItem('financeai_expenses_cache');
+    localStorage.removeItem('financeai_amount_overrides');
+    
+    // Immediate UI reset
+    await updateDashboard();
+    updateExpensesTable();
+    await updateInsights();
+    
+    // Show feedback
+    const toast = document.getElementById('toast');
+    if (toast) {
+        toast.querySelector('span').textContent = '✨ Starting fresh! Old entries hidden.';
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+}
+
+function checkMonthlyReset() {
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
+    const lastMonthKey = localStorage.getItem('financeai_last_active_month');
+
+    if (lastMonthKey && lastMonthKey !== currentMonthKey) {
+        if (confirm(`Welcome to a new month! 📅\n\nWould you like to clear your previous data and start fresh for ${now.toLocaleString('default', { month: 'long' })}?`)) {
+            handleClearAll();
+        }
+    }
+    
+    localStorage.setItem('financeai_last_active_month', currentMonthKey);
 }
 
 function addExpense(expense) {
@@ -162,21 +319,14 @@ function updateSyncStatus(status) {
 
     const states = {
         'not-connected': { text: '⚪ Sheets: Not Connected', class: 'sync-off' },
-        'syncing':       { text: '🔄 Syncing to Sheets...', class: 'sync-pending' },
-        'synced':        { text: '🟢 Synced to Google Sheets', class: 'sync-ok' },
-        'error':         { text: '🔴 Sheets Sync Failed', class: 'sync-error' },
+        'syncing':       { text: '🔄 Fetching from Sheets...', class: 'sync-pending' },
+        'synced':        { text: '🟢 Connected to Google Sheets', class: 'sync-ok' },
+        'error':         { text: '🔴 Sheets Fetch Failed', class: 'sync-error' },
     };
 
     const s = states[status] || states['not-connected'];
     indicator.textContent = s.text;
     indicator.className = 'sync-indicator ' + s.class;
-
-    // Auto-hide success after 3s
-    if (status === 'synced') {
-        setTimeout(() => {
-            indicator.textContent = '🟢 Connected to Sheets';
-        }, 3000);
-    }
 }
 
 function deleteExpense(id) {
@@ -189,46 +339,9 @@ function clearAllExpenses() {
     saveExpenses([]);
 }
 
-// ===== SAMPLE DATA =====
+// ===== SAMPLE DATA (Disabled for Sheet Integration) =====
 function loadSampleData() {
-    const expenses = loadExpenses();
-    if (expenses.length > 0) return;
-
-    const sampleData = [
-        { amount: 250, date: '2025-04-01', description: 'Zomato lunch', override: '' },
-        { amount: 150, date: '2025-04-01', description: 'Metro card recharge', override: '' },
-        { amount: 499, date: '2025-04-02', description: 'Netflix monthly subscription', override: '' },
-        { amount: 80, date: '2025-04-02', description: 'Chai and samosa at canteen', override: '' },
-        { amount: 1200, date: '2025-04-03', description: 'New t-shirt from Myntra', override: '' },
-        { amount: 350, date: '2025-04-03', description: 'Uber to airport', override: '' },
-        { amount: 200, date: '2025-04-04', description: 'Paracetamol from pharmacy', override: '' },
-        { amount: 5000, date: '2025-04-04', description: 'Monthly room rent', override: 'Rent/Housing' },
-        { amount: 120, date: '2025-04-05', description: 'Jio mobile recharge', override: '' },
-        { amount: 450, date: '2025-04-05', description: 'Swiggy dinner', override: '' },
-        { amount: 300, date: '2025-04-06', description: 'Haircut at salon', override: '' },
-        { amount: 180, date: '2025-04-06', description: 'Auto rickshaw to market', override: '' },
-        { amount: 850, date: '2025-04-07', description: 'Groceries from BigBasket', override: '' },
-        { amount: 599, date: '2025-04-07', description: 'Coursera course subscription', override: '' },
-        { amount: 60, date: '2025-04-08', description: 'Tea and biscuits', override: '' },
-        { amount: 1500, date: '2025-04-08', description: 'Electricity bill payment', override: '' },
-        { amount: 320, date: '2025-04-09', description: 'Dominos pizza with friends', override: '' },
-        { amount: 250, date: '2025-04-09', description: 'Movie tickets PVR', override: '' },
-        { amount: 400, date: '2025-04-10', description: 'Uber to office', override: '' },
-        { amount: 180, date: '2025-04-10', description: 'Maggi and juice at hostel', override: '' },
-    ];
-
-    sampleData.forEach(item => {
-        const ai = aiCategorize(item.description);
-        addExpense({
-            amount: item.amount,
-            date: item.date,
-            description: item.description,
-            categoryOverride: item.override,
-            aiCategory: ai.category,
-            aiSubcategory: ai.subcategory,
-            finalCategory: item.override || ai.category,
-        });
-    });
+    // No longer needed as we fetch from Google Sheets
 }
 
 // ===== UI CONTROLLERS =====
@@ -260,13 +373,66 @@ function initTabs() {
             document.getElementById(tab.dataset.tab).classList.add('active');
         });
     });
+
+    // Overlay Flow
+    const budgetOverlay = document.getElementById('budgetOverlay');
+    const formOverlay = document.getElementById('formOverlay');
+    const budgetInput = document.getElementById('initialBudgetInput');
+
+    // Step 1: Set Budget
+    document.getElementById('setBudgetBtn').addEventListener('click', () => {
+        const val = parseInt(budgetInput.value);
+        if (val && val >= 100) {
+            CONFIG.monthlyBudget = val;
+            localStorage.setItem('financeai_budget', val);
+            budgetOverlay.classList.add('hidden');
+            updateDashboard();
+            updateInsights();
+        } else {
+            alert('Please enter a valid monthly budget (min ₹100)');
+        }
+    });
+
+    // Close Form Overlay
+    const closeFormBtn = document.getElementById('closeFormOverlay');
+    if (closeFormBtn) {
+        closeFormBtn.addEventListener('click', () => {
+            formOverlay.classList.add('hidden');
+            refreshAllData();
+        });
+    }
+
+    // Header Budget Edit
+    document.getElementById('editBudgetIcon').addEventListener('click', () => {
+        budgetInput.value = CONFIG.monthlyBudget;
+        budgetOverlay.classList.remove('hidden');
+    });
 }
 
 // ===== DASHBOARD =====
 let pieChart, lineChart;
 
-function updateDashboard() {
-    const expenses = loadExpenses();
+async function refreshAllData() {
+    sessionStorage.removeItem('financeai_cleared');
+    await loadExpenses(true);
+    updateDashboard();
+    updateExpensesTable();
+    updateInsights();
+}
+
+async function updateDashboard() {
+    const allExpenses = await loadExpenses();
+    
+    // Filter for THIS month only
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    const expenses = allExpenses.filter(e => {
+        const d = new Date(e.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
     const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
     const saved = CONFIG.monthlyBudget - totalSpent;
     const savingsRate = CONFIG.monthlyBudget > 0 ? (saved / CONFIG.monthlyBudget * 100) : 100;
@@ -274,12 +440,13 @@ function updateDashboard() {
 
     // Header
     document.getElementById('headerTotal').textContent = `₹${totalSpent.toLocaleString('en-IN')}`;
-    document.getElementById('headerBudgetLeft').textContent = `₹${Math.max(0, saved).toLocaleString('en-IN')}`;
+    document.getElementById('headerBudget').textContent = `₹${CONFIG.monthlyBudget.toLocaleString('en-IN')}`;
     document.getElementById('headerSavings').textContent = `${Math.max(0, savingsRate).toFixed(0)}%`;
     document.getElementById('headerSavings').style.color = savingsRate >= 10 ? '#10b981' : '#ef4444';
 
     // Summary cards
     document.getElementById('totalSpent').textContent = `₹${totalSpent.toLocaleString('en-IN')}`;
+    document.getElementById('cardBudget').textContent = `₹${CONFIG.monthlyBudget.toLocaleString('en-IN')}`;
     document.getElementById('totalSaved').textContent = `₹${Math.max(0, saved).toLocaleString('en-IN')}`;
     document.getElementById('totalTransactions').textContent = expenses.length;
 
@@ -364,9 +531,9 @@ function updateCategoryBars(expenses, totalSpent) {
 
 function updateCharts(expenses) {
     const categoryTotals = {};
-    Object.keys(CONFIG.categories).forEach(cat => {
-        const total = expenses.filter(e => e.finalCategory === cat).reduce((s, e) => s + e.amount, 0);
-        if (total > 0) categoryTotals[cat] = total;
+    expenses.forEach(e => {
+        const cat = e.finalCategory || 'Miscellaneous';
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + e.amount;
     });
 
     // Pie Chart
@@ -375,7 +542,9 @@ function updateCharts(expenses) {
 
     const pieLabels = Object.keys(categoryTotals);
     const pieData = Object.values(categoryTotals);
-    const pieColors = pieLabels.map(l => CONFIG.categories[l].color);
+    const pieColors = pieLabels.map(l => {
+        return CONFIG.categories[l] ? CONFIG.categories[l].color : '#6b7280'; // Fallback to grey
+    });
 
     pieChart = new Chart(pieCtx, {
         type: 'doughnut',
@@ -393,6 +562,7 @@ function updateCharts(expenses) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false,
             cutout: '60%',
             plugins: {
                 legend: {
@@ -425,13 +595,21 @@ function updateCharts(expenses) {
         }
     });
 
-    // Line Chart - Daily spending
+    // Line Chart - Cumulative Monthly Spending
     const dailyMap = {};
     expenses.forEach(e => {
         dailyMap[e.date] = (dailyMap[e.date] || 0) + e.amount;
     });
+    
     const sortedDates = Object.keys(dailyMap).sort();
-    const dailyAmounts = sortedDates.map(d => dailyMap[d]);
+    
+    // Calculate cumulative totals
+    let runningTotal = 0;
+    const cumulativeAmounts = sortedDates.map(d => {
+        runningTotal += dailyMap[d];
+        return runningTotal;
+    });
+
     const dateLabels = sortedDates.map(d => {
         const dt = new Date(d);
         return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
@@ -449,8 +627,8 @@ function updateCharts(expenses) {
         data: {
             labels: dateLabels,
             datasets: [{
-                label: 'Daily Spending (₹)',
-                data: dailyAmounts,
+                label: 'Cumulative Spending (₹)',
+                data: cumulativeAmounts,
                 borderColor: '#6c5ce7',
                 backgroundColor: gradient,
                 fill: true,
@@ -466,6 +644,7 @@ function updateCharts(expenses) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false,
             scales: {
                 x: {
                     grid: { color: 'rgba(255,255,255,0.03)' },
@@ -499,76 +678,42 @@ function updateCharts(expenses) {
     });
 }
 
-// ===== EXPENSE FORM =====
+// ===== EXPENSE FORM (Replaced by Google Form) =====
 function initForm() {
-    const form = document.getElementById('expenseForm');
-    const descInput = document.getElementById('description');
-    const dateInput = document.getElementById('date');
+    const iframes = document.querySelectorAll('.iframe-container iframe');
+    const pageLoadTime = Date.now();
 
-    // Set default date to today
-    dateInput.value = new Date().toISOString().split('T')[0];
+    iframes.forEach(iframe => {
+        iframe.addEventListener('load', () => {
+            // Ignore loads that happen within 3 seconds of the initial page load
+            if (Date.now() - pageLoadTime < 3000) return;
 
-    // Live AI preview
-    let previewTimeout;
-    descInput.addEventListener('input', () => {
-        clearTimeout(previewTimeout);
-        previewTimeout = setTimeout(() => {
-            const desc = descInput.value.trim();
-            const preview = document.getElementById('aiPreview');
-            if (desc.length >= 3) {
-                const result = aiCategorize(desc);
-                document.getElementById('aiCategory').textContent = `${CONFIG.categories[result.category]?.icon || '📦'} ${result.category}`;
-                document.getElementById('aiSubcategory').textContent = result.subcategory;
-                preview.style.display = 'flex';
-            } else {
-                preview.style.display = 'none';
-            }
-        }, 300);
-    });
-
-    // Form submit
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-
-        const amount = parseFloat(document.getElementById('amount').value);
-        const date = dateInput.value;
-        const description = descInput.value.trim();
-        const override = document.getElementById('categoryOverride').value;
-
-        if (!amount || !date || !description) return;
-
-        const ai = aiCategorize(description);
-
-        addExpense({
-            amount,
-            date,
-            description,
-            categoryOverride: override,
-            aiCategory: ai.category,
-            aiSubcategory: ai.subcategory,
-            finalCategory: override || ai.category,
+            console.log('🔄 Possible form submission detected. Syncing...');
+            triggerAutoSync();
         });
-
-        // Show toast
-        const toast = document.getElementById('toast');
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 2500);
-
-        // Reset form
-        form.reset();
-        dateInput.value = new Date().toISOString().split('T')[0];
-        document.getElementById('aiPreview').style.display = 'none';
-
-        // Update all views
-        updateDashboard();
-        updateExpensesTable();
-        updateInsights();
     });
 }
 
+function triggerAutoSync() {
+    const toast = document.getElementById('toast');
+    if (toast) {
+        toast.querySelector('span').textContent = '🔄 Syncing with Google Sheets...';
+        toast.classList.add('show');
+    }
+
+    // Wait 3 seconds for Google Sheets to process the new entry
+    setTimeout(async () => {
+        await refreshAllData();
+        if (toast) {
+            toast.querySelector('span').textContent = '✅ Dashboard Updated!';
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+    }, 3000);
+}
+
 // ===== EXPENSES TABLE =====
-function updateExpensesTable() {
-    const expenses = loadExpenses();
+async function updateExpensesTable() {
+    const expenses = await loadExpenses();
     const filter = document.getElementById('filterCategory').value;
     const tbody = document.getElementById('expensesBody');
     const emptyState = document.getElementById('emptyState');
@@ -584,7 +729,8 @@ function updateExpensesTable() {
     emptyState.style.display = 'none';
 
     tbody.innerHTML = filtered.map(e => {
-        const catConfig = CONFIG.categories[e.finalCategory] || {};
+        const catConfig = CONFIG.categories[e.finalCategory] || CONFIG.categories['Miscellaneous'];
+        const aiCatConfig = CONFIG.categories[e.aiCategory] || CONFIG.categories['Miscellaneous'];
         const dateFormatted = new Date(e.date).toLocaleDateString('en-IN', {
             day: 'numeric', month: 'short', year: 'numeric'
         });
@@ -593,25 +739,77 @@ function updateExpensesTable() {
             <tr>
                 <td>${dateFormatted}</td>
                 <td>${e.description}</td>
-                <td class="amount-cell">₹${e.amount.toLocaleString('en-IN')}</td>
-                <td><span class="category-badge" style="background: ${catConfig.color}20; color: ${catConfig.color};">${catConfig.icon || '📦'} ${e.aiCategory}</span></td>
-                <td><span class="category-badge">${catConfig.icon || '📦'} ${e.finalCategory}</span></td>
-                <td><button class="delete-btn" onclick="handleDelete(${e.id})">🗑️</button></td>
+                <td class="amount-cell" id="amount-${e.id}">
+                    <span class="amount-val">₹${e.amount.toLocaleString('en-IN')}</span>
+                    ${e.isEdited ? '<span class="edited-tag" title="Locally edited">*</span>' : ''}
+                </td>
+                <td>
+                    <span class="category-badge ai-badge-hint" 
+                          style="background: ${aiCatConfig.color}15; color: ${aiCatConfig.color}; border: 1px solid ${aiCatConfig.color}30;"
+                          title="${aiCatConfig.description}">
+                        ${aiCatConfig.icon || '📦'} ${e.aiCategory}
+                    </span>
+                </td>
+                <td>
+                    <span class="category-badge" 
+                          style="background: ${catConfig.color}20; color: ${catConfig.color}; border: 1px solid ${catConfig.color}40;"
+                          title="${catConfig.description}">
+                        ${catConfig.icon || '📦'} ${e.finalCategory}
+                    </span>
+                </td>
+                <td>
+                    <div class="actions-cell">
+                        <button class="edit-btn" onclick="startEditAmount('${e.id}', ${e.amount})" title="Edit Amount">✏️</button>
+                        <button class="delete-btn" onclick="handleDelete('${e.id}')" title="Hide Expense">🗑️</button>
+                    </div>
+                </td>
             </tr>
         `;
     }).join('');
 }
 
 function handleDelete(id) {
-    deleteExpense(id);
+    // For sheet integration, we just filter it out locally
+    cachedExpenses = cachedExpenses.filter(e => e.id !== id);
     updateDashboard();
     updateExpensesTable();
     updateInsights();
 }
 
+function startEditAmount(id, currentAmount) {
+    const cell = document.getElementById(`amount-${id}`);
+    if (!cell) return;
+    
+    cell.innerHTML = `
+        <input type="number" class="amount-edit-input" value="${currentAmount}" 
+               onblur="finishEditAmount('${id}', this.value)" 
+               onkeydown="if(event.key==='Enter') this.blur()">
+    `;
+    cell.querySelector('input').focus();
+}
+
+function finishEditAmount(id, newAmount) {
+    if (newAmount && !isNaN(newAmount)) {
+        saveAmountOverride(id, newAmount);
+        refreshAllData();
+    } else {
+        updateExpensesTable(); // Reset if invalid
+    }
+}
+
 // ===== AI INSIGHTS =====
-function updateInsights() {
-    const expenses = loadExpenses();
+async function updateInsights() {
+    const allExpenses = await loadExpenses();
+    
+    // Filter for THIS month only
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const expenses = allExpenses.filter(e => {
+        const d = new Date(e.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
     const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
 
     // Alerts
@@ -689,10 +887,30 @@ function updateInsights() {
 
     // Knowledge tips
     updateTips();
+    updateCategoryDefinitions();
+}
+
+function updateCategoryDefinitions() {
+    const container = document.getElementById('categoryDefinitionGrid');
+    if (!container) return;
+
+    container.innerHTML = Object.entries(CONFIG.categories).map(([name, cat]) => `
+        <div class="def-item">
+            <div class="def-header">
+                <span class="def-icon" style="background: ${cat.color}20; color: ${cat.color};">${cat.icon}</span>
+                <span class="def-name">${name}</span>
+            </div>
+            <p class="def-text">${cat.description}</p>
+        </div>
+    `).join('');
 }
 
 function updateWeeklyComparison(expenses) {
     const container = document.getElementById('weeklyGrid');
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
     const weeks = [
         { label: 'Week 1', start: 1, end: 7 },
         { label: 'Week 2', start: 8, end: 14 },
@@ -700,35 +918,32 @@ function updateWeeklyComparison(expenses) {
         { label: 'Week 4', start: 22, end: 31 },
     ];
 
-    let prevTotal = 0;
+    let cumulativeTotal = 0;
     container.innerHTML = weeks.map((week, i) => {
         const weekTotal = expenses.filter(e => {
-            const day = new Date(e.date).getDate();
-            return day >= week.start && day <= week.end;
+            const [year, month, day] = e.date.split('-').map(Number);
+            return day >= week.start && day <= week.end && (month - 1) === currentMonth && year === currentYear;
         }).reduce((s, e) => s + e.amount, 0);
 
-        let changeText = '', changeClass = 'neutral';
-        if (i > 0 && prevTotal > 0) {
-            const change = ((weekTotal - prevTotal) / prevTotal * 100).toFixed(1);
-            if (change > 0) {
-                changeText = `↑ ${change}%`;
-                changeClass = change > 20 ? 'up' : 'neutral';
-            } else {
-                changeText = `↓ ${Math.abs(change)}%`;
-                changeClass = 'down';
-            }
-            if (change > 20) changeText += ' ⚠️';
-        } else if (i === 0) {
-            changeText = '—';
-        }
+        cumulativeTotal += weekTotal;
 
-        prevTotal = weekTotal;
+        let statusText = '', statusClass = 'neutral';
+        if (cumulativeTotal > CONFIG.monthlyBudget) {
+            statusText = '🚨 Over Budget';
+            statusClass = 'down';
+        } else if (cumulativeTotal > CONFIG.monthlyBudget * 0.8) {
+            statusText = '⚠️ Near Limit';
+            statusClass = 'neutral';
+        } else if (cumulativeTotal > 0) {
+            statusText = '✅ On Track';
+            statusClass = 'positive';
+        }
 
         return `
             <div class="week-item">
-                <span class="week-label">${week.label}</span>
-                <span class="week-amount">₹${weekTotal.toLocaleString('en-IN')}</span>
-                <span class="week-change ${changeClass}">${changeText}</span>
+                <span class="week-label">${week.label} (Total)</span>
+                <span class="week-amount">₹${cumulativeTotal.toLocaleString('en-IN')}</span>
+                <span class="week-change ${statusClass}">${statusText}</span>
             </div>
         `;
     }).join('');
@@ -839,16 +1054,6 @@ function initEventListeners() {
     // Filter
     document.getElementById('filterCategory').addEventListener('change', updateExpensesTable);
 
-    // Clear all
-    document.getElementById('clearAll').addEventListener('click', () => {
-        if (confirm('Are you sure? This will delete ALL expenses.')) {
-            clearAllExpenses();
-            updateDashboard();
-            updateExpensesTable();
-            updateInsights();
-        }
-    });
-
     // Refresh insights
     document.getElementById('refreshInsights').addEventListener('click', () => {
         updateInsights();
@@ -856,15 +1061,75 @@ function initEventListeners() {
         btn.textContent = '✅ Updated!';
         setTimeout(() => btn.textContent = '🔄 Refresh Analysis', 1500);
     });
+
+    // Download Report (Print to PDF)
+    document.getElementById('downloadReport').addEventListener('click', async () => {
+        const canvases = document.querySelectorAll('canvas');
+        const images = [];
+        const tabs = document.querySelectorAll('.tab-content');
+        
+        // 1. Briefly show all tabs to ensure charts render
+        tabs.forEach(tab => {
+            tab.style.display = 'block';
+            tab.style.opacity = '1';
+            tab.style.visibility = 'visible';
+            tab.style.position = 'absolute'; // Keep it off-screen if possible
+            tab.style.left = '-9999px';
+        });
+
+        // 2. Wait a split second for Chart.js to render
+        await new Promise(r => setTimeout(r, 500));
+
+        // 3. Convert canvases to images
+        canvases.forEach(canvas => {
+            try {
+                const img = new Image();
+                img.src = canvas.toDataURL('image/png');
+                img.className = 'print-chart-image';
+                img.style.width = '100%';
+                img.style.height = 'auto';
+                img.style.display = 'none';
+                canvas.parentNode.appendChild(img);
+                images.push({ canvas, img });
+            } catch (e) {
+                console.error('Canvas capture failed:', e);
+            }
+        });
+
+        // 4. Reset tabs back to normal
+        tabs.forEach(tab => {
+            tab.style.display = '';
+            tab.style.opacity = '';
+            tab.style.visibility = '';
+            tab.style.position = '';
+            tab.style.left = '';
+        });
+
+        // 5. Trigger print
+        document.body.classList.add('is-printing');
+        window.print();
+
+        // 6. Cleanup
+        setTimeout(() => {
+            document.body.classList.remove('is-printing');
+            images.forEach(({ canvas, img }) => img.remove());
+        }, 1000);
+    });
 }
 
 // ===== INITIALIZE =====
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     createParticles();
     initTabs();
     initForm();
     initEventListeners();
-    loadSampleData();
+    
+    // Check for monthly reset
+    checkMonthlyReset();
+
+    // Direct load
+    await loadExpenses();
+    
     updateDashboard();
     updateExpensesTable();
     updateInsights();
