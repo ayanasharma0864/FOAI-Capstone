@@ -104,6 +104,7 @@ function aiCategorize(description) {
 // ===== DATA MANAGEMENT =====
 const STORAGE_KEY = 'financeai_expenses_cache';
 const OVERRIDE_KEY = 'financeai_amount_overrides';
+const DELETED_KEY = 'financeai_deleted_items';
 
 let cachedExpenses = [];
 
@@ -130,6 +131,9 @@ async function loadExpenses(forceRefresh = false) {
         const clearTimestampStr = localStorage.getItem('financeai_clear_timestamp');
         const clearTimestamp = clearTimestampStr ? new Date(clearTimestampStr).getTime() : 0;
 
+        // Get deleted items list
+        const deletedIds = JSON.parse(localStorage.getItem(DELETED_KEY) || '[]');
+
         const expenses = dataRows.map((row, index) => {
             const cols = parseCsvRow(row);
             const dateStr = cols[0] || '';
@@ -137,6 +141,12 @@ async function loadExpenses(forceRefresh = false) {
             
             // Skip if older than clear timestamp
             if (timestamp <= clearTimestamp) return null;
+
+            // Use timestamp as a stable ID (it's the first column in Google Form CSV)
+            const id = `sheet-${timestamp}-${index}`;
+
+            // Skip if in deleted list
+            if (deletedIds.includes(id)) return null;
 
             const amount = parseFloat(cols[1]) || 0;
             const description = cols[2] || '';
@@ -160,7 +170,7 @@ async function loadExpenses(forceRefresh = false) {
             const date = isNaN(dateObj.getTime()) ? new Date().toISOString().split('T')[0] : dateObj.toISOString().split('T')[0];
 
             return {
-                id: `sheet-${index}`,
+                id,
                 amount,
                 date,
                 description,
@@ -240,6 +250,7 @@ async function handleClearAll() {
     cachedExpenses = [];
     localStorage.removeItem('financeai_expenses_cache');
     localStorage.removeItem('financeai_amount_overrides');
+    localStorage.removeItem(DELETED_KEY);
     
     // Immediate UI reset
     await updateDashboard();
@@ -769,7 +780,16 @@ async function updateExpensesTable() {
 }
 
 function handleDelete(id) {
-    // For sheet integration, we just filter it out locally
+    if (!confirm('Hide this expense from the dashboard?')) return;
+
+    // Persist deletion
+    const deletedIds = JSON.parse(localStorage.getItem(DELETED_KEY) || '[]');
+    if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+        localStorage.setItem(DELETED_KEY, JSON.stringify(deletedIds));
+    }
+
+    // Immediate UI update
     cachedExpenses = cachedExpenses.filter(e => e.id !== id);
     updateDashboard();
     updateExpensesTable();
