@@ -11,7 +11,8 @@ const CONFIG = {
 
     // ⬇️ GOOGLE SHEETS CONFIGURATION ⬇️
     sheetCsvUrl: 'https://docs.google.com/spreadsheets/d/18_kS3zuA3mkE87lxPZkBXra4kjJk4esB7RkDpzVCWBc/gviz/tq?tqx=out:csv&gid=1488467775',
-    formUrl: 'https://docs.google.com/forms/d/e/1FAIpQLScYU-Iz4EYuGzhTB17QlA1KJc0YIz6QJkFVqdodrrlD9hspqw/viewform?embedded=true',
+    monthlySummarySheetUrl: 'https://docs.google.com/spreadsheets/d/18_kS3zuA3mkE87lxPZkBXra4kjJk4esB7RkDpzVCWBc/gviz/tq?tqx=out:csv&sheet=monthly%20summary',
+    formUrl: 'https://docs.google.com/forms/d/e/1FAIpQLScYU-Iz4EYuGzhTB17QlA1Kc0YIz6QJkFVqdodrrlD9hspqw/viewform?embedded=true',
 
     categories: {
         'Food':          { threshold: 35, icon: '🍕', color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444, #f97316)', description: 'Groceries, dining out, and food delivery apps' },
@@ -107,6 +108,7 @@ const OVERRIDE_KEY = 'financeai_amount_overrides';
 const DELETED_KEY = 'financeai_deleted_items';
 
 let cachedExpenses = [];
+let canvaLink = '';
 
 async function loadExpenses(forceRefresh = false) {
     // If cleared in this session and not forcing refresh, return empty
@@ -216,6 +218,53 @@ function parseCsvRow(row) {
     }
     result.push(current.trim());
     return result;
+}
+
+async function loadCanvaLink() {
+    try {
+        const response = await fetch(CONFIG.monthlySummarySheetUrl);
+        const csvText = await response.text();
+        const rows = csvText.split('\n').filter(row => row.trim() !== '');
+        if (rows.length === 0) {
+            canvaLink = '';
+            updateCanvaLinkUI();
+            return '';
+        }
+
+        const parsedRows = rows.map(parseCsvRow).filter(row => row.length > 0);
+        const dataRows = parsedRows.length > 1 ? parsedRows.slice(1) : parsedRows;
+        const latestRow = [...dataRows].reverse().find(row => (row[0] || '').trim() !== '') || [];
+        canvaLink = (latestRow[0] || '').trim();
+        updateCanvaLinkUI();
+        return canvaLink;
+    } catch (err) {
+        console.error('❌ Failed to fetch Canva link:', err);
+        canvaLink = '';
+        updateCanvaLinkUI();
+        return '';
+    }
+}
+
+function updateCanvaLinkUI() {
+    const previewFrame = document.getElementById('canvaPreviewFrame');
+    const previewStatus = document.getElementById('canvaPreviewStatus');
+    const previewNote = document.getElementById('canvaPreviewNote');
+    const downloadBtn = document.getElementById('downloadCanvaReport');
+    if (!previewFrame || !previewStatus || !previewNote || !downloadBtn) return;
+
+    if (canvaLink) {
+        previewFrame.src = canvaLink;
+        previewFrame.style.display = 'block';
+        previewStatus.textContent = 'Preview loaded';
+        previewNote.textContent = 'If the preview is blocked, open the report directly using the download button.';
+        downloadBtn.disabled = false;
+    } else {
+        previewFrame.src = '';
+        previewFrame.style.display = 'none';
+        previewStatus.textContent = 'No preview available';
+        previewNote.textContent = 'No Canva link found yet. Check the monthly summary sheet tab for the latest report entry.';
+        downloadBtn.disabled = true;
+    }
 }
 
 function applyLocalOverrides(expenses) {
@@ -426,6 +475,7 @@ let pieChart, lineChart;
 async function refreshAllData() {
     sessionStorage.removeItem('financeai_cleared');
     await loadExpenses(true);
+    await loadCanvaLink();
     updateDashboard();
     updateExpensesTable();
     updateInsights();
@@ -1082,7 +1132,20 @@ function initEventListeners() {
         setTimeout(() => btn.textContent = '🔄 Refresh Analysis', 1500);
     });
 
-    // Download Report (Print to PDF)
+    const downloadCanvaReportBtn = document.getElementById('downloadCanvaReport');
+    if (downloadCanvaReportBtn) {
+        downloadCanvaReportBtn.addEventListener('click', async () => {
+            if (!canvaLink) {
+                await loadCanvaLink();
+            }
+            if (canvaLink) {
+                window.open(canvaLink, '_blank', 'noopener');
+            } else {
+                alert('No Canva summary link found in the monthly summary sheet tab.');
+            }
+        });
+    }
+
     document.getElementById('downloadReport').addEventListener('click', async () => {
         const canvases = document.querySelectorAll('canvas');
         const images = [];
@@ -1093,7 +1156,7 @@ function initEventListeners() {
             tab.style.display = 'block';
             tab.style.opacity = '1';
             tab.style.visibility = 'visible';
-            tab.style.position = 'absolute'; // Keep it off-screen if possible
+            tab.style.position = 'absolute';
             tab.style.left = '-9999px';
         });
 
@@ -1149,6 +1212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Direct load
     await loadExpenses();
+    await loadCanvaLink();
     
     updateDashboard();
     updateExpensesTable();

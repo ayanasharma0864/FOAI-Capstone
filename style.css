@@ -1325,6 +1325,51 @@ select option {
     filter: brightness(1.1);
 }
 
+.canva-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.canva-preview-card {
+    margin-top: 24px;
+    padding: 20px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.canva-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.canva-preview-card iframe {
+    width: 100%;
+    min-height: 520px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    background: #0f1530;
+}
+
+.canva-preview-note {
+    margin-top: 12px;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.canva-note {
+    margin-top: 16px;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
 /* ===== CATEGORY REFERENCE ===== */
 .category-definition-grid {
     display: grid;

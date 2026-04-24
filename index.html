@@ -50,7 +50,7 @@
             <div class="logo">
                 <span class="logo-icon">💰</span>
                 <div>
-                    <h1>FinanceAI</h1>
+                    <h1>Finsight</h1>
                     <p class="logo-sub">AI Personal Finance Tracker & Advisor</p>
                 </div>
             </div>
@@ -88,6 +88,9 @@
         </button>
         <button class="nav-tab" data-tab="insights" id="tabInsights">
             <span class="tab-icon">🤖</span> AI Insights
+        </button>
+        <button class="nav-tab" data-tab="canva" id="tabCanva">
+            <span class="tab-icon">🎨</span> Canva Generated
         </button>
     </nav>
 
@@ -262,6 +265,29 @@
                     <div class="tips-grid" id="tipsGrid">
                         <!-- Dynamically generated -->
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="tab-content" id="canva">
+            <div class="insights-container">
+                <div class="insights-header">
+                    <h2>🎨 Canva Generated Report</h2>
+                    <p>Monthly summary from the Google Sheet <strong>monthly summary</strong> tab. The latest report link is pulled from the newest non-empty entry.</p>
+                    <div class="canva-actions">
+                        <button class="download-btn" id="downloadCanvaReport" disabled>⬇️ Download Canva Report</button>
+                    </div>
+                </div>
+                <div class="canva-preview-card">
+                    <div class="canva-preview-header">
+                        <span>Preview</span>
+                        <span id="canvaPreviewStatus">Loading preview...</span>
+                    </div>
+                    <iframe id="canvaPreviewFrame" src="" title="Canva report preview"></iframe>
+                    <p class="canva-preview-note" id="canvaPreviewNote">Preview will appear once the Canva link is loaded.</p>
+                </div>
+                <div class="canva-note">
+                    <p>If the preview does not load, the Canva share link may not allow embedding. Use the download button to open it directly.</p>
                 </div>
             </div>
         </section>
